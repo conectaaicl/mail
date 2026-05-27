@@ -1,0 +1,36 @@
+services:
+  mailsaas_web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      network: host
+    container_name: mailsaas_web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3004:3000"
+    volumes:
+      - mailsaas_data:/app/prisma/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/prisma/data/prod.db
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+volumes:
+  mailsaas_data:
+
+networks:
+  default:
+    name: conectaai_net
+    external: true
