@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 
-const DB_PATH = "/var/www/mail/prisma/dev.db"
+const DB_PATH = "/app/prisma/dev.db"
 
 function getUser(email: string) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
