@@ -15,7 +15,7 @@ async function getSystemStatus() {
     // 1. Database
     prisma.user.count().then(n => ({ name: "Base de datos SQLite", ok: true, detail: n + " usuarios", category: "infra" })),
     // 2. SMTP
-    Promise.resolve({ name: "SMTP Brevo", ok: !!process.env.SMTP_HOST, detail: process.env.SMTP_HOST ? "smtp-relay.brevo.com:587" : "Sin configurar", category: "email" }),
+    Promise.resolve({ name: "SMTP Email", ok: !!process.env.SMTP_HOST, detail: process.env.SMTP_HOST ? (process.env.SMTP_HOST + ":" + (process.env.SMTP_PORT ?? "587")) : "Sin configurar", category: "email" }),
     // 3. Domains
     prisma.domain.findMany().then(d => {
       const verified = d.filter(x => x.verified).length
@@ -31,13 +31,12 @@ async function getSystemStatus() {
     // 6. n8n webhook
     Promise.resolve({ name: "n8n Webhook", ok: !!process.env.N8N_WEBHOOK_URL, detail: process.env.N8N_WEBHOOK_URL ? "Configurado" : "Sin configurar", category: "integrations" }),
     // 7. Resend / Mail provider
-    Promise.resolve({ name: "Resend API", ok: !!process.env.RESEND_API_KEY, detail: process.env.RESEND_API_KEY ? "Key configurada" : "Sin configurar", category: "email" }),
     // 8. NextAuth
-    Promise.resolve({ name: "Auth / NextAuth", ok: !!process.env.NEXTAUTH_SECRET, detail: "JWT activo", category: "auth" }),
+    Promise.resolve({ name: "Auth / NextAuth", ok: !!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET), detail: "JWT activo", category: "auth" }),
     // 9. Social conectaai
-    fetch("https://social.conectaai.cl/api/status", { signal: AbortSignal.timeout(4000) }).then(r => ({ name: "Social IA", ok: r.ok, detail: r.ok ? "Online" : "Error " + r.status, category: "ecosystem" })).catch(() => ({ name: "Social IA", ok: false, detail: "Sin respuesta", category: "ecosystem" })),
+    fetch("https://social.conectaai.cl/api/status", { signal: AbortSignal.timeout(4000) }).then(r => ({ name: "Social IA", ok: r.ok || r.status === 401, detail: (r.ok || r.status === 401) ? "Online" : "Error " + r.status, category: "ecosystem" })).catch(() => ({ name: "Social IA", ok: false, detail: "Sin respuesta", category: "ecosystem" })),
     // 10. OmniFlow
-    fetch("https://osw.conectaai.cl/api/v1/health", { signal: AbortSignal.timeout(4000) }).then(r => ({ name: "OmniFlow CRM", ok: r.ok, detail: r.ok ? "Online" : "Error " + r.status, category: "ecosystem" })).catch(() => ({ name: "OmniFlow CRM", ok: false, detail: "Sin respuesta", category: "ecosystem" })),
+    fetch("https://osw.conectaai.cl/health", { signal: AbortSignal.timeout(4000) }).then(r => ({ name: "OmniFlow CRM", ok: r.ok, detail: r.ok ? "Online" : "Error " + r.status, category: "ecosystem" })).catch(() => ({ name: "OmniFlow CRM", ok: false, detail: "Sin respuesta", category: "ecosystem" })),
     // 11. SEO
     fetch("https://seo.conectaai.cl/health", { signal: AbortSignal.timeout(4000) }).then(r => ({ name: "SEO API", ok: r.ok, detail: r.ok ? "Online" : "Error " + r.status, category: "ecosystem" })).catch(() => ({ name: "SEO API", ok: false, detail: "Sin respuesta", category: "ecosystem" })),
     // 12. TerraBlinds
