@@ -12,18 +12,31 @@ export function createTransporter() {
   })
 }
 
+export interface MailAttachment {
+  filename: string
+  content: string  // base64
+  contentType?: string
+}
+
 export async function sendMail({
-  from, to, subject, text, html,
+  from, to, subject, text, html, attachments,
 }: {
   from: string
   to: string
   subject: string
   text?: string
   html?: string
+  attachments?: MailAttachment[]
 }) {
   const fromAddress = process.env.SMTP_FROM
     ? `${from.split('@')[0]} <${process.env.SMTP_FROM}>`
     : from
+
+  const nodemailerAttachments = attachments?.map(a => ({
+    filename: a.filename,
+    content: Buffer.from(a.content, 'base64'),
+    contentType: a.contentType || 'application/octet-stream',
+  }))
 
   const transporter = createTransporter()
   const info = await transporter.sendMail({
@@ -33,6 +46,7 @@ export async function sendMail({
     text,
     html: html || text,
     replyTo: from,
+    attachments: nodemailerAttachments,
   })
   return info
 }
