@@ -16,7 +16,8 @@ function resolveFrom(requested: string | undefined | null, workspace: any): stri
   const emailPart = emailMatch ? emailMatch[1] : requested;
   const domain = emailPart.split("@")[1]?.toLowerCase();
   const ok = workspace.domains?.some((d: any) => d.verified && d.name.toLowerCase() === domain);
-  return ok ? requested : null;
+  // Solo la direccion: el nombre visible se arma aparte (evita "Nombre <Nombre <dir>>").
+  return ok ? emailPart.trim() : null;
 }
 
 export async function POST(req: Request) {

@@ -15,6 +15,9 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/app/prisma/data/prod.db
+    networks:
+      - default
+      - omniflow_net
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -33,4 +36,6 @@ volumes:
 networks:
   default:
     name: conectaai_net
+    external: true
+  omniflow_net:
     external: true

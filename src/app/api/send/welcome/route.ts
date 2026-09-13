@@ -10,6 +10,15 @@ const transporter = nodemailer.createTransport({
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 });
 
+function resolveFrom(requested: string | undefined | null, workspace: any): string | null {
+  if (!requested) return null;
+  const emailMatch = requested.match(/<([^>]+)>/);
+  const emailPart = emailMatch ? emailMatch[1] : requested;
+  const domain = emailPart.split("@")[1]?.toLowerCase();
+  const ok = workspace.domains?.some((d: any) => d.verified && d.name.toLowerCase() === domain);
+  return ok ? requested : null;
+}
+
 export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer "))
@@ -17,16 +26,17 @@ export async function POST(req: Request) {
 
   const apiKey = await prisma.apiKey.findUnique({
     where: { key: authHeader.split(" ")[1] },
-    include: { workspace: true },
+    include: { workspace: { include: { domains: true } } },
   });
   if (!apiKey) return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
 
-  const { to, name, app_name, login_url } = await req.json();
+  const { to, name, app_name, login_url, from, reply_to } = await req.json();
   if (!to || !name) return NextResponse.json({ error: "Missing 'to' or 'name'" }, { status: 400 });
 
   const appName     = app_name || apiKey.workspace.name;
   const loginUrl    = login_url || process.env.NEXTAUTH_URL || "";
-  const fromAddress = process.env.SMTP_FROM || `noreply@${apiKey.workspace.slug}.com`;
+  const resolvedFrom = resolveFrom(from, apiKey.workspace);
+  const fromAddress = resolvedFrom || process.env.SMTP_FROM || `noreply@${apiKey.workspace.slug}.com`;
 
   const tpl = await prisma.template.findFirst({
     where: { workspaceId: apiKey.workspaceId, name: { in: ["bienvenida", "welcome"] } },
@@ -47,7 +57,7 @@ export async function POST(req: Request) {
   });
 
   try {
-    await transporter.sendMail({ from: `"${appName}" <${fromAddress}>`, to, subject: finalSubject, html: finalHtml });
+    await transporter.sendMail({ from: `"${appName}" <${fromAddress}>`, to, subject: finalSubject, html: finalHtml, replyTo: reply_to || undefined });
     await prisma.email.update({ where: { id: record.id }, data: { status: "DELIVERED" } });
     return NextResponse.json({ success: true, emailId: record.id });
   } catch (err: any) {
