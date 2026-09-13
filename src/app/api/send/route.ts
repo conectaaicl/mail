@@ -78,14 +78,21 @@ export async function POST(req: Request) {
     }
 
     const resolvedFrom = resolveFrom(from, apiKey.workspace);
-  const fromAddress = resolvedFrom || process.env.SMTP_FROM || `noreply@${apiKey.workspace.slug}.com`;
+    // "Nombre <direccion>": el nombre visible viene del cliente; la direccion solo se respeta si es la cuenta SMTP,
+    // un alias autorizado (SMTP_FROM_ALIASES, alias "Enviar como" de Gmail) o un dominio verificado del workspace.
+    const fromMatch = (from || "").match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+    const fromName = (fromMatch ? fromMatch[1].trim() : "") || apiKey.workspace.name;
+    const requestedAddr = (fromMatch ? fromMatch[2] : (from || "")).trim().toLowerCase();
+    const aliases = (process.env.SMTP_FROM_ALIASES || "").split(",").map(a => a.trim().toLowerCase()).filter(Boolean);
+    const aliasOk = requestedAddr && (requestedAddr === (process.env.SMTP_FROM || "").toLowerCase() || aliases.includes(requestedAddr));
+  const fromAddress = resolvedFrom || (aliasOk ? requestedAddr : null) || process.env.SMTP_FROM || `noreply@${apiKey.workspace.slug}.com`;
     const record = await prisma.email.create({
       data: { to, from: fromAddress, subject: finalSubject, bodyHtml: finalHtml, bodyText: finalText, direction: "OUTBOUND", status: "PENDING", workspaceId: apiKey.workspaceId },
     });
 
     try {
       if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        await transporter.sendMail({ from: `"${apiKey.workspace.name}" <${fromAddress}>`, to, subject: finalSubject, html: finalHtml || undefined, text: finalText || undefined, replyTo: reply_to || undefined, attachments: mailAttachments });
+        await transporter.sendMail({ from: `"${fromName.replace(/"/g, "")}" <${fromAddress}>`, to, subject: finalSubject, html: finalHtml || undefined, text: finalText || undefined, replyTo: reply_to || undefined, attachments: mailAttachments });
         await prisma.email.update({ where: { id: record.id }, data: { status: "DELIVERED" } });
       }
     } catch (err: any) {
